@@ -6,7 +6,7 @@ class Sat:
         self.A = A
         self.V = V
         self.f = f
-        self.q_size = A
+        self.q_size = 0
 
     def q_update(self, A_all, dt, w):
 

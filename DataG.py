@@ -18,10 +18,12 @@ class Generator:
         self.ts = self.df['target']
         self.predict = None
         self.result = None
-
+        self.order = (6, 1, 0)
+        self.sea_order = (0, 0, 0, 66)
     def train(self):
-        order, sea_order = self.auto_parameters(self.ts, int(len(self.ts) * 2 / 3))
-        model = sm.tsa.statespace.SARIMAX(self.ts, order=order, seasonal_order=sea_order)
+        if self.order is None:
+            self.order, self.sea_order = self.auto_parameters(self.ts, int(len(self.ts) * 2 / 3))
+        model = sm.tsa.statespace.SARIMAX(self.ts, order=self.order, seasonal_order=self.sea_order)
         results = model.fit()
         self.result = results
         return results
@@ -31,6 +33,9 @@ class Generator:
         self.predict = predict
         return predict
 
+    def get_predict(self):
+        self.G = self.result.predict()
+        return self.G
     def draw(self):
         self.predict.plot(color='green', label='Forecast')
         self.ts.plot(color='blue', label='Original')

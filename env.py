@@ -1,4 +1,5 @@
 import numpy as np
+from DataG import Generator
 
 from Network import Network
 from Sat import Sat
@@ -17,19 +18,26 @@ class env:
         self.net = Network(self.N)
         self.A = [0 for i in range(self.N)]
         # 一个任务来临的时间序列
-        self.line = np.linspace(1, 100, self.T)
+        self.line = np.linspace(1, 30, self.T) + 10 * np.random.random(self.T)
+        self.g = Generator(self.line)
+        self.g.train()
+        self.G = self.g.get_predict()
         self.w = 10
 
     def ini(self):
         self.A = [0 for i in range(self.N)]
         self.sats = [Sat(10, 10, 10) for i in range(self.N)]
 
-
     def reset(self):
         self.ini()
         # self.update()
-
-        return
+        R = []
+        for key in self.net.L:
+            R.append(self.net.L[key])
+        Q = [self.sats[i].q_size for i in range(len(self.sats))]
+        A = self.A
+        H = self.line[self.t: self.t + 10]
+        return np.concatenate(np.array(R), np.array(Q) , np.array(A) , np.array(H))
 
     def update(self, action=None):
 
@@ -44,7 +52,11 @@ class env:
             R.append(self.net.L[key])
         Q = [self.sats[i].q_size for i in range(len(self.sats))]
         A = self.A
-        H = self.line
+        if self.t < 50:
+            H = self.line[self.t: self.t + 10]
+        else:
+            H = self.G[self.t: self.t + 10]
+
         next_state = R + Q + A + H
 
         return next_state
@@ -146,5 +158,5 @@ class env:
 
     def reward(self, action):
 
-        return self.get_dt(action) + self.get_dc(action) + self.get_db() + self.get_dw()
+        return self.get_dt(action) + self.get_dc(action) + self.get_db() + self.get_dw(action)
 

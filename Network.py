@@ -41,7 +41,7 @@ class Network:
 
         for i in range(self.N):
             for j in range(self.N):
-                self.L[(i, j)] = 1e5
+                self.L[(i, j)] = 10000
 
         for a, b in self.G.edges:
             self.L[(a, b)] = self.G[a][b]['R']
@@ -50,4 +50,4 @@ class Network:
         for k in range(self.N):
             for i in range(self.N):
                 for j in range(self.N):
-                    self.L[(i, j)] = max(self.L[(i, j)], self.L[(i, k)] + self.L[(k, j)])
+                    self.L[(i, j)] = min(self.L[(i, j)], self.L[(i, k)] + self.L[(k, j)])

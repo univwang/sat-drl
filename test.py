@@ -1,10 +1,9 @@
 from DataG import Generator
+from env import env
 import numpy as np
 
-mydata = np.linspace(1, 30, 30) + 10 * np.random.random(30) + 0
 
-g = Generator(mydata)
+myenv = env()
+state = myenv.reset()
 
-g.train()
-g.get_forest(30)
-g.draw()
+print(state)

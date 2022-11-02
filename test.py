@@ -6,4 +6,4 @@ import numpy as np
 myenv = env()
 state = myenv.reset()
 
-print(state)
+action = []

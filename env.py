@@ -9,7 +9,7 @@ class env:
     def __init__(self):
         self.dt = 120  # 一个时隙的时间
         self.T = 100  # 一个回合的的长度
-        self.N = 20  # 网络的节点数量
+        self.N = 3  # 网络的节点数量
         self.p = 10  # 传输功率
         self.kn = 10  # 任务的比特数
         self.px = 0.5  # 未来数据占的比例
@@ -18,8 +18,10 @@ class env:
         self.net = Network(self.N)
         self.A = [0 for i in range(self.N)]
         # 一个任务来临的时间序列
-        self.line = np.linspace(1, 30, self.T) + 10 * np.random.random(self.T)
+        # self.line = np.linspace(1, 30, self.T) + 10 * np.random.random(self.T)
+        self.line = np.array([1, 3, 10, 11, 11, 8, 3, 6, 9, 4])
         self.g = Generator(self.line)
+
         self.g.train()
         self.G = self.g.get_predict()
         self.w = 10
@@ -30,14 +32,21 @@ class env:
 
     def reset(self):
         self.ini()
-        # self.update()
+
+        q = 0
+        for i in range(self.N):
+            for j in range(self.N):
+                q += action[j][i]
+            self.A[i] = q
+
         R = []
         for key in self.net.L:
             R.append(self.net.L[key])
         Q = [self.sats[i].q_size for i in range(len(self.sats))]
         A = self.A
         H = self.line[self.t: self.t + 10]
-        return np.concatenate(np.array(R), np.array(Q) , np.array(A) , np.array(H))
+        H = list(map(int, H))
+        return np.concatenate((np.array(R), np.array(Q), np.array(A), np.array(H)))
 
     def update(self, action=None):
 
@@ -57,8 +66,7 @@ class env:
         else:
             H = self.G[self.t: self.t + 10]
 
-        next_state = R + Q + A + H
-
+        next_state = np.concatenate((R, Q, A, H))
         return next_state
 
     def check(self, action):
@@ -159,4 +167,3 @@ class env:
     def reward(self, action):
 
         return self.get_dt(action) + self.get_dc(action) + self.get_db() + self.get_dw(action)
-

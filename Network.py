@@ -19,6 +19,8 @@ class Network:
             a, b = edge
             self.G[a][b]['R'] = 10
 
+        if self.check() is False:
+            print("图不联通")
         self.set_all_l()
 
     def rand_add_edge(self, vi, vj, p=0.2):
@@ -56,3 +58,9 @@ class Network:
             for i in range(self.N):
                 for j in range(self.N):
                     self.L[(i, j)] = min(self.L[(i, j)], self.L[(i, k)] + self.L[(k, j)])
+
+
+    def check(self):
+        # 检查当前网络是否是联通的
+      return nx.is_connected(self.G)
+

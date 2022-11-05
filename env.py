@@ -16,7 +16,7 @@ class env:
         self.t = 0  # 当前的时间点
         self.sats = [Sat(10, 10, 10) for i in range(self.N)]
         self.net = Network(self.N)
-        self.A = [0 for i in range(self.N)]
+        self.A = [0 for i in range(self.N)]  # 任务分配方案
         # 一个任务来临的时间序列
         # self.line = np.linspace(1, 30, self.T) + 10 * np.random.random(self.T)
         # 任务多一点
@@ -47,11 +47,7 @@ class env:
         H = list(map(int, H))  # 转化为整数
         return np.concatenate((np.array(R), np.array(Q), np.array(A1), np.array(H)))
 
-    def update(self, action=None):
-
-        if action is None:
-            action = []
-
+    def update(self):
         for i in range(self.N):
             self.sats[i].q_update(self.A[i], self.dt, self.w)
 
@@ -60,35 +56,55 @@ class env:
             R.append(self.net.L[key])
         Q = [self.sats[i].q_size for i in range(len(self.sats))]
         A1 = [self.line[i][self.t] for i in range(self.N)]
-        if self.t < 50:
-            H = self.line[self.t: self.t + 2]
-        else:
-            H = self.G[self.t: self.t + 2]
 
+        H = []
+        for i in range(self.N):
+           H.append(self.line[i][self.t + 1: self.t + 3])
+
+        H = sum(H, [])  # 二维展开
+        H = list(map(int, H))  # 转化为整数
         next_state = np.concatenate((R, Q, A1, H))
         return next_state
 
-    def check(self, action):
+    def check(self, env_action):
         for i in range(self.N):
-            if self.sats[i].q_size > self.sats[i].A:
-                return False
+            if self.sats[i].q_size > self.sats[i].A or env_action[i][i] < 0:
+                return True
+        return False
 
     def step(self, action):
 
-        q = 0
+        env_action = [[0 for i in range(self.N)] for i in range(self.N)]
+        # action 是除了自己以外的调度任务数量
+
         for i in range(self.N):
+            for j in range(self.N - 1):
+                if j >= i:
+                    env_action[i][j + 1] = action[i][j]
+                else:
+                    env_action[i][j] = action[i][j]
+
+
+        for i in range(self.N):
+            q = 0
             for j in range(self.N):
-                q += action[j][i]
+                    q += env_action[j][i]
             self.A[i] = q
 
-        reward = self.reward(action)
-        next_state = self.update(action)
+        for i in range(self.N):
+            q = 0
+            for j in range(self.N):
+                q += env_action[i][j]
+            env_action[i][i] = self.line[i][self.t] - q
+            self.A[i] += env_action[i][i]
 
-        done = self.check(action) or self.t == self.T
-        if done is True:
-            reward -= 1000
         self.t += 1
-        return done, next_state, reward
+        reward = self.reward(env_action)
+        next_state = self.update()
+        done = self.check(env_action) or self.t == self.T
+        if done is True:
+            reward -= 10000
+        return done, reward, next_state
 
     def get_et(self, action):
 
@@ -118,22 +134,16 @@ class env:
         return d
 
     def get_dc(self, action):
-
         d = 0
-
         for i in range(self.N):
             for j in range(self.N):
                 d += action[i][j] * self.kn * self.w / self.sats[j].f
-
         return d
 
     def get_db(self):
-
         d = 0
-
         for i in range(self.N):
             d += self.w * self.sats[i].q_size / self.sats[i].V / self.sats[i].f
-
         return d
 
     def get_dw(self, action):
@@ -160,5 +170,4 @@ class env:
         return res / self.N
 
     def reward(self, action):
-
-        return self.get_dt(action) + self.get_dc(action) + self.get_db() + self.get_dw(action)
+        return -(self.get_dt(action) + self.get_dc(action) + self.get_db() + self.get_dw(action) + self.get_load_b())

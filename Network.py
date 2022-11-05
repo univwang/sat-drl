@@ -9,9 +9,11 @@ class Network:
         self.N = N
         self.H = nx.path_graph(N)
         self.L = {}
-        for i in range(N):
-            for j in range(i + 1, N):
-                self.rand_add_edge(i, j)
+        # for i in range(N):
+        #     for j in range(i + 1, N):
+        #         self.rand_add_edge(i, j)
+        self.G.add_edge(0, 1)
+        self.G.add_edge(1, 2)
 
         for edge in self.G.edges():
             a, b = edge
@@ -42,6 +44,9 @@ class Network:
         for i in range(self.N):
             for j in range(self.N):
                 self.L[(i, j)] = 10000
+
+        for i in range(self.N):
+            self.L[(i, i)] = 0
 
         for a, b in self.G.edges:
             self.L[(a, b)] = self.G[a][b]['R']

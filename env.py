@@ -19,9 +19,11 @@ class env:
         self.A = [0 for i in range(self.N)]
         # 一个任务来临的时间序列
         # self.line = np.linspace(1, 30, self.T) + 10 * np.random.random(self.T)
-        self.line = np.array([1, 3, 10, 11, 11, 8, 3, 6, 9, 4])
-        self.g = Generator(self.line)
-
+        # 任务多一点
+        self.line = [1, 3, 10, 11, 11, 8, 3, 6, 9, 4]
+        # self.line = np.expand_dims(self.line, 0).repeat(self.N, axis=0)
+        self.line = [self.line for i in range(self.N)]
+        self.g = Generator(self.line[0])
         self.g.train()
         self.G = self.g.get_predict()
         self.w = 10
@@ -32,21 +34,18 @@ class env:
 
     def reset(self):
         self.ini()
-
-        q = 0
-        for i in range(self.N):
-            for j in range(self.N):
-                q += action[j][i]
-            self.A[i] = q
-
         R = []
         for key in self.net.L:
             R.append(self.net.L[key])
         Q = [self.sats[i].q_size for i in range(len(self.sats))]
-        A = self.A
-        H = self.line[self.t: self.t + 10]
-        H = list(map(int, H))
-        return np.concatenate((np.array(R), np.array(Q), np.array(A), np.array(H)))
+        A1 = [self.line[i][self.t] for i in range(self.N)]
+        H = []
+        for i in range(self.N):
+           H.append(self.line[i][self.t + 1: self.t + 3])
+
+        H = sum(H, [])  # 二维展开
+        H = list(map(int, H))  # 转化为整数
+        return np.concatenate((np.array(R), np.array(Q), np.array(A1), np.array(H)))
 
     def update(self, action=None):
 
@@ -60,22 +59,18 @@ class env:
         for key in self.net.L:
             R.append(self.net.L[key])
         Q = [self.sats[i].q_size for i in range(len(self.sats))]
-        A = self.A
+        A1 = [self.line[i][self.t] for i in range(self.N)]
         if self.t < 50:
-            H = self.line[self.t: self.t + 10]
+            H = self.line[self.t: self.t + 2]
         else:
-            H = self.G[self.t: self.t + 10]
+            H = self.G[self.t: self.t + 2]
 
-        next_state = np.concatenate((R, Q, A, H))
+        next_state = np.concatenate((R, Q, A1, H))
         return next_state
 
     def check(self, action):
         for i in range(self.N):
-            if self.sats[i].q_size < 0:
-                return False
-
-        for i in range(self.N):
-            if self.A[i] != self.line[self.t]:
+            if self.sats[i].q_size > self.sats[i].A:
                 return False
 
     def step(self, action):
@@ -151,8 +146,8 @@ class env:
         b_all = []
         for i in range(self.N):
             pred = 0
-            for j in range(len(self.line)):
-                pred = pred * self.px + self.line[j]
+            for j in range(len(self.line[i])):
+                pred = pred * self.px + self.line[i][j]
             b_all.append((self.sats[i].V * self.sats[i].f / self.w)
                          * (self.sats[i].q_size + self.A[i] + pred))
 

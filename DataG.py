@@ -13,6 +13,7 @@ from sklearn.metrics import mean_squared_error,mean_absolute_error,r2_score
 # %config InlineBackend.figure_format = 'svg'
 class Generator:
     def __init__(self, odata):
+        odata = np.array(odata)
         self.df = pd.DataFrame(odata, columns=['target'])
         self.df.index = pd.util.testing.makeDateIndex(len(self.df), '30S')
         self.ts = self.df['target']
@@ -36,6 +37,7 @@ class Generator:
     def get_predict(self):
         self.G = self.result.predict()
         return self.G
+
     def draw(self):
         self.predict.plot(color='green', label='Forecast')
         self.ts.plot(color='blue', label='Original')
@@ -53,8 +55,8 @@ class Generator:
                                     error_action='ignore',
                                     suppress_warnings=True,
                                     stepwise=True)
-        print("AIC: ", stepwise_model.aic())
-        print(stepwise_model.order)  # (p,d,q)
-        print(stepwise_model.seasonal_order)  # (P,D,Q,S)
+        # print("AIC: ", stepwise_model.aic())
+        # print(stepwise_model.order)  # (p,d,q)
+        # print(stepwise_model.seasonal_order)  # (P,D,Q,S)
         # print(stepwise_model.summary())  # 详细模型
         return stepwise_model.order, stepwise_model.seasonal_order

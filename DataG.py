@@ -15,17 +15,18 @@ class Generator:
     def __init__(self, odata):
         odata = np.array(odata)
         self.df = pd.DataFrame(odata, columns=['target'])
-        self.df.index = pd.util.testing.makeDateIndex(len(self.df), '30S')
+        self.df.index = pd.util.testing.makeDateIndex(len(self.df), '120S')
         self.ts = self.df['target']
         self.predict = None
         self.result = None
-        self.order = (6, 1, 0)
-        self.sea_order = (0, 0, 0, 66)
+        self.order = (3, 2, 4)
+        self.sea_order = (0, 0, 0, 0)
+
     def train(self):
         if self.order is None:
             self.order, self.sea_order = self.auto_parameters(self.ts, int(len(self.ts) * 2 / 3))
         model = sm.tsa.statespace.SARIMAX(self.ts, order=self.order, seasonal_order=self.sea_order)
-        results = model.fit()
+        results = model.fit(disp=0)
         self.result = results
         return results
 
@@ -34,9 +35,10 @@ class Generator:
         self.predict = predict
         return predict
 
-    def get_predict(self):
-        self.G = self.result.predict()
-        return self.G
+    def get_predict(self, start, end):
+        # 获取这个时间点后边的五个数据
+        self.G = self.result.predict(start, end, dynamic=True)
+        return self.G.values.tolist()
 
     def draw(self):
         self.predict.plot(color='green', label='Forecast')

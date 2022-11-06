@@ -19,7 +19,7 @@ class PolicyNet(torch.nn.Module):
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
-        return torch.tanh(self.fc2(x)) * self.action_bound
+        return abs(torch.tanh(self.fc2(x))) * self.action_bound
 
 
 class QValueNet(torch.nn.Module):
@@ -57,9 +57,10 @@ class DDPG:
         self.device = device
 
     def take_action(self, state):
-        state = torch.tensor([state], dtype=torch.float).to(self.device)
-        action = self.actor(state).item()
+        state = torch.tensor(state, dtype=torch.float).to(self.device)
+        action = self.actor(state)
         # 给动作添加噪声，增加探索
+        action = action.detach().numpy()
         action = action + self.sigma * np.random.randn(self.action_dim)
         return action
 
@@ -69,7 +70,7 @@ class DDPG:
 
     def update(self, transition_dict):
         states = torch.tensor(transition_dict['states'], dtype=torch.float).to(self.device)
-        actions = torch.tensor(transition_dict['actions'], dtype=torch.float).view(-1, 1).to(self.device)
+        actions = torch.tensor(transition_dict['actions'], dtype=torch.float).to(self.device)
         rewards = torch.tensor(transition_dict['rewards'], dtype=torch.float).view(-1, 1).to(self.device)
         next_states = torch.tensor(transition_dict['next_states'], dtype=torch.float).to(self.device)
         dones = torch.tensor(transition_dict['dones'], dtype=torch.float).view(-1, 1).to(self.device)
@@ -90,16 +91,42 @@ class DDPG:
         self.soft_update(self.critic, self.target_critic)  # 软更新价值网络
 
 
-actor_lr = 3e-4
-critic_lr = 3e-3
-num_episodes = 200
-hidden_dim = 64
+
+def train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size, batch_size):
+    return_list = []
+    for i in range(10):
+        with tqdm(total=int(num_episodes/10), desc='Iteration %d' % i) as pbar:
+            for i_episode in range(int(num_episodes/10)):
+                episode_return = 0
+                state = env.reset()
+                done = False
+                while not done:
+                    action = agent.take_action(state)
+                    done, reward, next_state = env.step(action)
+                    replay_buffer.add(state, action, reward, next_state, done)
+                    state = next_state
+                    episode_return += reward
+                    if replay_buffer.size() > minimal_size:
+                        b_s, b_a, b_r, b_ns, b_d = replay_buffer.sample(batch_size)
+                        transition_dict = {'states': b_s, 'actions': b_a, 'next_states': b_ns, 'rewards': b_r, 'dones': b_d}
+                        agent.update(transition_dict)
+                return_list.append(episode_return)
+                if (i_episode+1) % 10 == 0:
+                    pbar.set_postfix({'episode': '%d' % (num_episodes/10 * i + i_episode+1), 'return': '%.3f' % np.mean(return_list[-10:])})
+                pbar.update(1)
+    return return_list
+
+
+actor_lr = 3e-3
+critic_lr = 3e-2
+num_episodes = 10000
+hidden_dim = 128
 gamma = 0.98
 tau = 0.005  # 软更新参数
 buffer_size = 10000
-minimal_size = 1000
-batch_size = 64
-sigma = 0.01  # 高斯噪声标准差
+minimal_size = 200
+batch_size = 128
+sigma = 0.5  # 高斯噪声标准差
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 env = env()
@@ -107,9 +134,22 @@ random.seed(0)
 np.random.seed(0)
 torch.manual_seed(0)
 replay_buffer = rl_utils.ReplayBuffer(buffer_size)
-state_dim = env.N * env.N + env.N + env.N + 10  # 链路状态 算力队列状态 任务到达状态 任务估计状态
-action_dim = env.N * env.N
-action_bound = env.N * [20]  # 最多调度20的任务数量
+state_dim = env.N * env.N + env.N + env.N + 2 * env.N  # 链路状态 算力队列状态 任务到达状态 任务估计状态
+action_dim = env.N * (env.N - 1)
+action_bound = 3.0
 agent = DDPG(state_dim, hidden_dim, action_dim, action_bound, sigma, actor_lr, critic_lr, tau, gamma, device)
+return_list = train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size, batch_size)
 
-return_list = rl_utils.train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size, batch_size)
+actions = [[0, 1, 0, 1, 0, 0], [0, 3, 0, 3, 0, 0]]
+def test(env, agent):
+    done = False
+    state = env.reset()
+    t = 0
+    while done is False:
+        action = agent.take_action(state)
+        # action = actions[t]
+        # t += 1
+        done, reward, next_state = env.step(action)
+        print(reward, next_state, action)
+
+test(env, agent)

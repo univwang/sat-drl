@@ -8,14 +8,16 @@ from Sat import Sat
 class env:
     def __init__(self):
         self.dt = 120  # 一个时隙的时间
-        self.T = 100  # 一个回合的的长度
+        self.T = 5  # 一个回合的的长度
         self.N = 3  # 网络的节点数量
         self.p = 10  # 传输功率
         self.kn = 10  # 任务的比特数
         self.px = 0.5  # 未来数据占的比例
         self.t = 0  # 当前的时间点
-        self.sats = [Sat(10, 10, 10) for i in range(self.N)]
+        # self.sats = [Sat(10, 10, 10) for i in range(self.N)]
+        self.sats = [Sat(0, 0, 0), Sat(0, 0, 0), Sat(100, 10, 10)]
         self.net = Network(self.N)
+
         self.A = [0 for i in range(self.N)]  # 任务分配方案
         # 一个任务来临的时间序列
         # self.line = np.linspace(1, 30, self.T) + 10 * np.random.random(self.T)
@@ -23,15 +25,15 @@ class env:
         self.line = [1, 3, 10, 11, 11, 8, 3, 6, 9, 4]
         # self.line = np.expand_dims(self.line, 0).repeat(self.N, axis=0)
         self.line = [self.line for i in range(self.N)]
-        self.g = Generator(self.line[0])
-        self.g.train()
-        self.G = self.g.get_predict()
+        self.G = [Generator(self.line[i]) for i in range(self.N)]
+        for g in self.G:
+            g.train()
         self.w = 10
 
     def ini(self):
         self.A = [0 for i in range(self.N)]
-        self.sats = [Sat(10, 10, 10) for i in range(self.N)]
-
+        # self.sats = [Sat(10, 10, 10) for i in range(self.N)]
+        self.sats = [Sat(0, 0.001, 0.001), Sat(0, 0.001, 0.001), Sat(100, 10, 10)]
     def reset(self):
         self.ini()
         R = []
@@ -41,11 +43,12 @@ class env:
         A1 = [self.line[i][self.t] for i in range(self.N)]
         H = []
         for i in range(self.N):
-           H.append(self.line[i][self.t + 1: self.t + 3])
+           H.append(self.line[i][self.t + 1: self.t + 3])  # 两组后边的数据
 
         H = sum(H, [])  # 二维展开
         H = list(map(int, H))  # 转化为整数
-        return np.concatenate((np.array(R), np.array(Q), np.array(A1), np.array(H)))
+        self.t = 0
+        return np.concatenate([np.array(R), np.array(Q), np.array(A1), np.array(H)], axis=0)
 
     def update(self):
         for i in range(self.N):
@@ -59,7 +62,7 @@ class env:
 
         H = []
         for i in range(self.N):
-           H.append(self.line[i][self.t + 1: self.t + 3])
+           H.append(self.G[i].get_predict(self.t + 1, self.t + 2))   # 两组后边的数据
 
         H = sum(H, [])  # 二维展开
         H = list(map(int, H))  # 转化为整数
@@ -67,29 +70,43 @@ class env:
         return next_state
 
     def check(self, env_action):
+        reward = 0
+
         for i in range(self.N):
-            if self.sats[i].q_size > self.sats[i].A or env_action[i][i] < 0:
-                return True
-        return False
+            for j in range(self.N):
+                if env_action[i][j] < 0:
+                    reward += env_action[i][j]
+
+
+        # if reward < 0:
+        #     return reward
+        if reward > 0:
+            reward = 0
+
+        for i in range(self.N):
+            if self.sats[i].q_size > self.sats[i].A:
+                reward -= self.sats[i].q_size - self.sats[i].A
+
+        return reward
 
     def step(self, action):
-
+        action = list(map(int, action))
         env_action = [[0 for i in range(self.N)] for i in range(self.N)]
         # action 是除了自己以外的调度任务数量
 
         for i in range(self.N):
             for j in range(self.N - 1):
                 if j >= i:
-                    env_action[i][j + 1] = action[i][j]
+                    env_action[i][j + 1] = action[i * (self.N - 1) + j]
                 else:
-                    env_action[i][j] = action[i][j]
-
+                    env_action[i][j] = action[i * (self.N - 1) + j]
 
         for i in range(self.N):
             q = 0
             for j in range(self.N):
                     q += env_action[j][i]
             self.A[i] = q
+
 
         for i in range(self.N):
             q = 0
@@ -101,10 +118,16 @@ class env:
         self.t += 1
         reward = self.reward(env_action)
         next_state = self.update()
-        done = self.check(env_action) or self.t == self.T
-        if done is True:
-            reward -= 10000
-        return done, reward, next_state
+        publish = self.check(env_action)
+
+
+        if self.t == self.T or publish < 0:
+            isdone = True
+        else:
+            isdone = False
+        if publish < 0:
+            reward = publish * 100
+        return isdone, reward, next_state
 
     def get_et(self, action):
 
@@ -170,4 +193,5 @@ class env:
         return res / self.N
 
     def reward(self, action):
+        return 0
         return -(self.get_dt(action) + self.get_dc(action) + self.get_db() + self.get_dw(action) + self.get_load_b())

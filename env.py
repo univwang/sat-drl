@@ -90,7 +90,7 @@ class env:
         return reward
 
     def step(self, action):
-        action = list(map(int, action))
+        action = list(map(round, action))
         env_action = [[0 for i in range(self.N)] for i in range(self.N)]
         # action 是除了自己以外的调度任务数量
 
@@ -115,6 +115,8 @@ class env:
             env_action[i][i] = self.line[i][self.t] - q
             self.A[i] += env_action[i][i]
 
+        # print(env_action)
+
         self.t += 1
         reward = self.reward(env_action)
         next_state = self.update()
@@ -127,6 +129,7 @@ class env:
             isdone = False
         if publish < 0:
             reward = publish * 100
+
         return isdone, reward, next_state
 
     def get_et(self, action):

@@ -93,6 +93,12 @@ class env:
         action = list(map(round, action))
         env_action = [[0 for i in range(self.N)] for i in range(self.N)]
         # action 是除了自己以外的调度任务数量
+        publish = 0
+        # 记录action中小于0的，归0并惩罚
+        for i in range(self.N):
+             for j in range(self.N - 1):
+                 if action[i * (self.N - 1) + j] < 0:
+                     publish += action[i * (self.N - 1) + j]
 
         for i in range(self.N):
             for j in range(self.N - 1):
@@ -115,21 +121,28 @@ class env:
             env_action[i][i] = self.line[i][self.t] - q
             self.A[i] += env_action[i][i]
 
-        # print(env_action)
 
         self.t += 1
         reward = self.reward(env_action)
         next_state = self.update()
-        publish = self.check(env_action)
+        # publish = self.check(env_action)
+
+        # 遍历卫星，如果发现队列超了，惩罚
+        for i in range(self.N):
+            if self.sats[i].q_size > self.sats[i].A:
+                publish += self.sats[i].A - self.sats[i].q_size
+                self.sats[i].q_size = self.sats[i].A
 
 
-        if self.t == self.T or publish < 0:
+        if self.t == self.T:
             isdone = True
         else:
             isdone = False
-        if publish < 0:
-            reward = publish * 100
 
+        reward += publish * 10
+        # reward += 100  # 基本回合奖励
+        if reward < -500:
+            reward = -500
         return isdone, reward, next_state
 
     def get_et(self, action):

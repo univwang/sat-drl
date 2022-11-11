@@ -21,8 +21,8 @@ class PolicyNet(torch.nn.Module):
     def forward(self, x):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-        return abs(torch.tanh(self.fc3(x))) * self.action_bound
-
+        # return torch.tanh(self.fc3(x)) * self.action_bound
+        return torch.relu(self.fc3(x)) * self.action_bound
 
 class QValueNet(torch.nn.Module):
     def __init__(self, state_dim, hidden_dim, action_dim):
@@ -121,7 +121,7 @@ def train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size
 
 actor_lr = 3e-3
 critic_lr = 3e-2
-num_episodes = 10000
+num_episodes = 500
 hidden_dim = 128
 gamma = 0.98
 tau = 0.005  # 软更新参数
@@ -129,8 +129,8 @@ buffer_size = 10000
 minimal_size = 200
 batch_size = 128
 sigma = 0.5  # 高斯噪声标准差
-device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-
+# device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+device = torch.device("cpu")
 env = env()
 random.seed(0)
 np.random.seed(0)
@@ -141,6 +141,21 @@ action_dim = env.N * (env.N - 1)
 action_bound = 3.0
 agent = DDPG(state_dim, hidden_dim, action_dim, action_bound, sigma, actor_lr, critic_lr, tau, gamma, device)
 return_list = train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size, batch_size)
+
+print(return_list)
+episodes_list = list(range(len(return_list)))
+plt.plot(episodes_list, return_list)
+plt.xlabel('Episodes')
+plt.ylabel('Returns')
+plt.title('DDPG on Sat')
+plt.show()
+
+mv_return = rl_utils.moving_average(return_list, 9)
+plt.plot(episodes_list, mv_return)
+plt.xlabel('Episodes')
+plt.ylabel('Returns')
+plt.title('DDPG on Sat')
+plt.show()
 
 actions = [[0, 1, 0, 1, 0, 0], [0, 3, 0, 3, 0, 0], [-0.14942606, 1.98019495, 0.99843384, -0.35590187, -0.1747995, 0.48665994]]
 def test(env, agent):

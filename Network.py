@@ -15,6 +15,7 @@ class Network:
         self.G.add_edge(0, 1)
         self.G.add_edge(1, 2)
 
+
         for edge in self.G.edges():
             a, b = edge
             self.G[a][b]['R'] = 10

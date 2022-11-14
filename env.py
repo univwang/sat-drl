@@ -33,7 +33,7 @@ class env:
     def ini(self):
         self.A = [0 for i in range(self.N)]
         # self.sats = [Sat(10, 10, 10) for i in range(self.N)]
-        self.sats = [Sat(0, 0.001, 0.001), Sat(0, 0.001, 0.001), Sat(100, 10, 10)]
+        self.sats = [Sat(0, 0, 0), Sat(0, 0, 0), Sat(100, 10, 10)]
     def reset(self):
         self.ini()
         R = []
@@ -107,10 +107,24 @@ class env:
                 else:
                     env_action[i][j] = action[i * (self.N - 1) + j]
 
+        # print(env_action)
+        # 遍历卫星，如果发现有调度的数量大于到来的任务数量，惩罚并归0
+
+        # print(env_action)
+
         for i in range(self.N):
             q = 0
             for j in range(self.N):
-                    q += env_action[j][i]
+                if q + env_action[i][j] > self.line[i][self.t]:
+                    publish += self.line[i][self.t] - (q + env_action[i][j])
+                    env_action[i][j] = 0
+                q += env_action[i][j]
+        # print(publish)
+
+        for i in range(self.N):
+            q = 0
+            for j in range(self.N):
+                q += env_action[j][i]
             self.A[i] = q
 
 
@@ -132,6 +146,8 @@ class env:
             if self.sats[i].q_size > self.sats[i].A:
                 publish += self.sats[i].A - self.sats[i].q_size
                 self.sats[i].q_size = self.sats[i].A
+
+
 
 
         if self.t == self.T:
@@ -175,30 +191,34 @@ class env:
     def get_dc(self, action):
         d = 0
         for i in range(self.N):
-            for j in range(self.N):
-                d += action[i][j] * self.kn * self.w / self.sats[j].f
+                for j in range(self.N):
+                    if self.sats[j].f > 0:
+                        d += action[i][j] * self.kn * self.w / self.sats[j].f
         return d
 
     def get_db(self):
         d = 0
         for i in range(self.N):
-            d += self.w * self.sats[i].q_size / self.sats[i].V / self.sats[i].f
+            if self.sats[i].f > 0:
+                d += self.w * self.sats[i].q_size / self.sats[i].V / self.sats[i].f
         return d
 
     def get_dw(self, action):
         d = 0
         for i in range(self.N):
-            d += self.kn * self.w * (self.A[i] - action[i][i]) / (2 * self.sats[i].V * self.sats[i].f)
+            if self.sats[i].f > 0:
+                d += self.kn * self.w * (self.A[i] - action[i][i]) / (2 * self.sats[i].V * self.sats[i].f)
         return d
 
     def get_load_b(self):
         b_all = []
         for i in range(self.N):
-            pred = 0
-            for j in range(len(self.line[i])):
-                pred = pred * self.px + self.line[i][j]
-            b_all.append((self.sats[i].V * self.sats[i].f / self.w)
-                         * (self.sats[i].q_size + self.A[i] + pred))
+            if self.sats[i].f > 0:
+                pred = 0
+                for j in range(len(self.line[i])):
+                    pred = pred * self.px + self.line[i][j]
+                b_all.append((self.sats[i].V * self.sats[i].f / self.w)
+                             * (self.sats[i].q_size + self.A[i] + pred))
 
         b_ = sum(b_all) / self.N
 
@@ -209,5 +229,6 @@ class env:
         return res / self.N
 
     def reward(self, action):
-        return 0
-        return -(self.get_dt(action) + self.get_dc(action) + self.get_db() + self.get_dw(action) + self.get_load_b())
+        # return 0
+        # print(self.get_dt(action), self.get_dc(action), self.get_db(), self.get_dw(action), self.get_load_b())
+        return -(self.get_dt(action) / 10 + self.get_dc(action) + self.get_db() + self.get_dw(action) + self.get_load_b() / 100)

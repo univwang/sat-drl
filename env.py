@@ -229,6 +229,6 @@ class env:
         return res / self.N
 
     def reward(self, action):
-        # return 0
+        return 0
         # print(self.get_dt(action), self.get_dc(action), self.get_db(), self.get_dw(action), self.get_load_b())
-        return -(self.get_dt(action) / 10 + self.get_dc(action) + self.get_db() + self.get_dw(action) + self.get_load_b() / 100)
+        return -(self.get_dt(action) / 1000 + self.get_dc(action) / 10 + self.get_db() + self.get_dw(action) + self.get_load_b() / 1000)

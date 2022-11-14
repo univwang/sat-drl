@@ -14,27 +14,33 @@ class PolicyNet(torch.nn.Module):
     def __init__(self, state_dim, hidden_dim, action_dim, action_bound):
         super(PolicyNet, self).__init__()
         self.fc1 = torch.nn.Linear(state_dim, hidden_dim)
-        self.fc2 = torch.nn.Linear(hidden_dim, 64)
-        self.fc3 = torch.nn.Linear(64, action_dim)
+        self.fc2 = torch.nn.Linear(hidden_dim, 256)
+        self.fc3 = torch.nn.Linear(256, 128)
+
+        self.fc4 = torch.nn.Linear(128, action_dim)
         self.action_bound = action_bound  # action_bound是环境可以接受的动作最大值
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
         # return torch.tanh(self.fc3(x)) * self.action_bound
-        return abs(torch.tanh(self.fc3(x))) * self.action_bound
+        return abs(torch.tanh(self.fc4(x))) * self.action_bound
         # return torch.relu(self.fc3(x)) * self.action_bound
 class QValueNet(torch.nn.Module):
     def __init__(self, state_dim, hidden_dim, action_dim):
         super(QValueNet, self).__init__()
         self.fc1 = torch.nn.Linear(state_dim + action_dim, hidden_dim)
         self.fc2 = torch.nn.Linear(hidden_dim, hidden_dim)
+        self.fc3 = torch.nn.Linear(hidden_dim, hidden_dim)
+
         self.fc_out = torch.nn.Linear(hidden_dim, 1)
 
     def forward(self, x, a):
         cat = torch.cat([x, a], dim=1)  # 拼接状态和动作
         x = F.relu(self.fc1(cat))
         x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
         return self.fc_out(x)
 
 
@@ -161,14 +167,12 @@ return_list = train_off_policy_agent(env, agent, num_episodes, replay_buffer, mi
 # plt.title('DDPG on Sat')
 # plt.show()
 
-actions = [[0, 1, 0, 1, 0, 0], [0, 3, 0, 3, 0, 0], [-0.14942606, 1.98019495, 0.99843384, -0.35590187, -0.1747995, 0.48665994]]
-actions1 = [  0.,     709.1757, 164.2829,   0.,       0.,       0.,    ]
-actions2 = [413.85562, 161.73581,   0.,        0.,        0.,        0.     ]
+actions = [[0, 1, 0, 1, 0, 0] for i in range(5)]
 def test(env, agent):
     done = False
     state = env.reset()
     agent.set_test(True)
-    t = 2
+    t = 0
     while done is False:
         action = agent.take_action(state)
         # action = actions2

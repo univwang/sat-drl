@@ -11,29 +11,29 @@ class env:
         self.T = 5  # 一个回合的的长度
         self.N = 3  # 网络的节点数量
         self.p = 10  # 传输功率
-        self.kn = 10  # 任务的比特数
+        self.kn = 0.0168  # 任务的比特数
         self.px = 0.5  # 未来数据占的比例
         self.t = 0  # 当前的时间点
         # self.sats = [Sat(10, 10, 10) for i in range(self.N)]
-        self.sats = [Sat(0, 0, 0), Sat(0, 0, 0), Sat(100, 10, 10)]
+        self.sats = [Sat(0, 0, 0, self.kn), Sat(0, 0, 0, self.kn), Sat(100, 32, 12.8, self.kn)]
         self.net = Network(self.N)
 
         self.A = [0 for i in range(self.N)]  # 任务分配方案
         # 一个任务来临的时间序列
         # self.line = np.linspace(1, 30, self.T) + 10 * np.random.random(self.T)
         # 任务多一点
-        self.line = [1, 3, 10, 11, 11, 8, 3, 6, 9, 4]
+        self.line = [100, 300, 1000, 1100, 1100, 800, 300, 600, 900, 400]
         # self.line = np.expand_dims(self.line, 0).repeat(self.N, axis=0)
         self.line = [self.line for i in range(self.N)]
         self.G = [Generator(self.line[i]) for i in range(self.N)]
         for g in self.G:
             g.train()
-        self.w = 10
+        self.w = 8
 
     def ini(self):
         self.A = [0 for i in range(self.N)]
         # self.sats = [Sat(10, 10, 10) for i in range(self.N)]
-        self.sats = [Sat(0, 0, 0), Sat(0, 0, 0), Sat(100, 10, 10)]
+        self.sats = [Sat(0, 0, 0, self.kn), Sat(0, 0, 0, self.kn), Sat(2000, 32, 12.8, self.kn)]
     def reset(self):
         self.ini()
         R = []
@@ -155,10 +155,9 @@ class env:
         else:
             isdone = False
 
-        reward += publish * 10
+        reward += publish
+        reward += 2000
         # reward += 100  # 基本回合奖励
-        if reward < -500:
-            reward = -500
         return isdone, reward, next_state
 
     def get_et(self, action):

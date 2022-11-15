@@ -149,7 +149,7 @@ torch.manual_seed(0)
 replay_buffer = rl_utils.ReplayBuffer(buffer_size)
 state_dim = env.N * env.N + env.N + env.N + 2 * env.N  # 链路状态 算力队列状态 任务到达状态 任务估计状态
 action_dim = env.N * (env.N - 1)
-action_bound = 5.0
+action_bound = 500.0
 agent = DDPG(state_dim, hidden_dim, action_dim, action_bound, sigma, actor_lr, critic_lr, tau, gamma, device)
 return_list = train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size, batch_size)
 
@@ -167,7 +167,7 @@ return_list = train_off_policy_agent(env, agent, num_episodes, replay_buffer, mi
 # plt.title('DDPG on Sat')
 # plt.show()
 
-actions = [[0, 1, 0, 1, 0, 0] for i in range(5)]
+actions = [[500, 500, 500, 500, 500, 500] for i in range(5)]
 def test(env, agent):
     done = False
     state = env.reset()
@@ -177,7 +177,7 @@ def test(env, agent):
         action = agent.take_action(state)
         # action = actions2
         # action = actions[t]
-        # t += 1
+        t += 1
         done, reward, next_state = env.step(action)
         state = next_state
         print(reward, next_state, action)

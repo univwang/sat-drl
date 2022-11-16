@@ -139,7 +139,7 @@ tau = 0.005  # 软更新参数
 buffer_size = 10000
 minimal_size = 200
 batch_size = 128
-sigma = 0.8  # 高斯噪声标准差
+sigma = 30  # 高斯噪声标准差
 # device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 device = torch.device("cpu")
 env = env()
@@ -149,9 +149,9 @@ torch.manual_seed(0)
 replay_buffer = rl_utils.ReplayBuffer(buffer_size)
 state_dim = env.N * env.N + env.N + env.N + 2 * env.N  # 链路状态 算力队列状态 任务到达状态 任务估计状态
 action_dim = env.N * (env.N - 1)
-action_bound = 500.0
+action_bound = 400.0
 agent = DDPG(state_dim, hidden_dim, action_dim, action_bound, sigma, actor_lr, critic_lr, tau, gamma, device)
-return_list = train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size, batch_size)
+# return_list = train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size, batch_size)
 
 # episodes_list = list(range(len(return_list)))
 # plt.plot(episodes_list, return_list)
@@ -167,16 +167,16 @@ return_list = train_off_policy_agent(env, agent, num_episodes, replay_buffer, mi
 # plt.title('DDPG on Sat')
 # plt.show()
 
-actions = [[500, 500, 500, 500, 500, 500] for i in range(5)]
+actions = [[0, 400, 0, 400, 0, 0] for i in range(5)]
 def test(env, agent):
     done = False
     state = env.reset()
     agent.set_test(True)
     t = 0
     while done is False:
-        action = agent.take_action(state)
+        # action = agent.take_action(state)
         # action = actions2
-        # action = actions[t]
+        action = actions[t]
         t += 1
         done, reward, next_state = env.step(action)
         state = next_state

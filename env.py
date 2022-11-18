@@ -11,18 +11,17 @@ class env:
         self.T = 5  # 一个回合的的长度
         self.N = 3  # 网络的节点数量
         self.p = 10  # 传输功率
-        self.kn = 0.0168  # 任务的比特数
-        self.px = 0.5  # 未来数据占的比例
+        self.kn = 1  # 任务的比特数
+        self.px = 0.41  # 未来数据占的比例
         self.t = 0  # 当前的时间点
         # self.sats = [Sat(10, 10, 10) for i in range(self.N)]
-        self.sats = [Sat(0, 0, 0, self.kn), Sat(0, 0, 0, self.kn), Sat(100, 32, 12.8, self.kn)]
+        self.sats = [Sat(0, 0, 0, self.kn), Sat(0, 0, 0, self.kn), Sat(2000, 32, 12.8, self.kn)]
         self.net = Network(self.N)
 
         self.A = [0 for i in range(self.N)]  # 任务分配方案
         # 一个任务来临的时间序列
         # self.line = np.linspace(1, 30, self.T) + 10 * np.random.random(self.T)
-        # 任务多一点
-        self.line = [100, 300, 1000, 1100, 1100, 800, 300, 600, 900, 400]
+        self.line = [100, 300, 500, 500, 600, 800, 300, 600, 700, 400]
         # self.line = np.expand_dims(self.line, 0).repeat(self.N, axis=0)
         self.line = [self.line for i in range(self.N)]
         self.G = [Generator(self.line[i]) for i in range(self.N)]
@@ -33,9 +32,15 @@ class env:
     def ini(self):
         self.A = [0 for i in range(self.N)]
         # self.sats = [Sat(10, 10, 10) for i in range(self.N)]
+        self.line = np.random.randint(100, 1000, 10)
+        self.line = list(self.line)
+        self.line = [self.line for i in range(self.N)]
         self.sats = [Sat(0, 0, 0, self.kn), Sat(0, 0, 0, self.kn), Sat(2000, 32, 12.8, self.kn)]
+
     def reset(self):
         self.ini()
+
+        self.t = 0
         R = []
         for key in self.net.L:
             R.append(self.net.L[key])
@@ -43,11 +48,11 @@ class env:
         A1 = [self.line[i][self.t] for i in range(self.N)]
         H = []
         for i in range(self.N):
-           H.append(self.line[i][self.t + 1: self.t + 3])  # 两组后边的数据
+            H.append(self.line[i][self.t + 1: self.t + 3])  # 两组后边的数据
 
         H = sum(H, [])  # 二维展开
         H = list(map(int, H))  # 转化为整数
-        self.t = 0
+
         return np.concatenate([np.array(R), np.array(Q), np.array(A1), np.array(H)], axis=0)
 
     def update(self):
@@ -62,10 +67,11 @@ class env:
 
         H = []
         for i in range(self.N):
-           H.append(self.G[i].get_predict(self.t + 1, self.t + 2))   # 两组后边的数据
+            H.append(self.G[i].get_predict(self.t + 1, self.t + 2))  # 两组后边的数据
 
         H = sum(H, [])  # 二维展开
         H = list(map(int, H))  # 转化为整数
+
         next_state = np.concatenate((R, Q, A1, H))
         return next_state
 
@@ -76,7 +82,6 @@ class env:
             for j in range(self.N):
                 if env_action[i][j] < 0:
                     reward += env_action[i][j]
-
 
         # if reward < 0:
         #     return reward
@@ -94,11 +99,7 @@ class env:
         env_action = [[0 for i in range(self.N)] for i in range(self.N)]
         # action 是除了自己以外的调度任务数量
         publish = 0
-        # 记录action中小于0的，归0并惩罚
-        for i in range(self.N):
-             for j in range(self.N - 1):
-                 if action[i * (self.N - 1) + j] < 0:
-                     publish += action[i * (self.N - 1) + j]
+        get = 0
 
         for i in range(self.N):
             for j in range(self.N - 1):
@@ -110,23 +111,22 @@ class env:
         # print(env_action)
         # 遍历卫星，如果发现有调度的数量大于到来的任务数量，惩罚并归0
 
-        # print(env_action)
-
         for i in range(self.N):
             q = 0
             for j in range(self.N):
                 if q + env_action[i][j] > self.line[i][self.t]:
-                    publish += self.line[i][self.t] - (q + env_action[i][j])
+                    # publish += self.line[i][self.t] - (q + env_action[i][j])
                     env_action[i][j] = 0
                 q += env_action[i][j]
-        # print(publish)
+            # if q > self.line[i][self.t]:
+            #     publish += self.line[i][self.t] - q
+            get += q
 
         for i in range(self.N):
             q = 0
             for j in range(self.N):
                 q += env_action[j][i]
             self.A[i] = q
-
 
         for i in range(self.N):
             q = 0
@@ -135,29 +135,22 @@ class env:
             env_action[i][i] = self.line[i][self.t] - q
             self.A[i] += env_action[i][i]
 
-
         self.t += 1
         reward = self.reward(env_action)
         next_state = self.update()
-        # publish = self.check(env_action)
 
-        # 遍历卫星，如果发现队列超了，惩罚
-        for i in range(self.N):
-            if self.sats[i].q_size > self.sats[i].A:
-                publish += self.sats[i].A - self.sats[i].q_size
-                self.sats[i].q_size = self.sats[i].A
-
-
-
+        # # 遍历卫星，如果发现队列超了，惩罚
+        # for i in range(self.N):
+        #     if self.sats[i].q_size > self.sats[i].A:
+        #         publish += self.sats[i].A - self.sats[i].q_size
+        #         self.sats[i].q_size = self.sats[i].A
 
         if self.t == self.T:
             isdone = True
         else:
             isdone = False
 
-        reward += publish
-        reward += 2000
-        # reward += 100  # 基本回合奖励
+        reward += publish * 5 + get
         return isdone, reward, next_state
 
     def get_et(self, action):
@@ -190,16 +183,16 @@ class env:
     def get_dc(self, action):
         d = 0
         for i in range(self.N):
-                for j in range(self.N):
-                    if self.sats[j].f > 0:
-                        d += action[i][j] * self.kn * self.w / self.sats[j].f
+            for j in range(self.N):
+                if self.sats[j].f > 0:
+                    d += action[i][j] * self.kn * self.w / self.sats[j].f
         return d
 
     def get_db(self):
         d = 0
         for i in range(self.N):
             if self.sats[i].f > 0:
-                d += self.w * self.sats[i].q_size / self.sats[i].V / self.sats[i].f
+                d += self.w * self.sats[i].q_size * self.kn / self.sats[i].V / self.sats[i].f
         return d
 
     def get_dw(self, action):
@@ -230,4 +223,5 @@ class env:
     def reward(self, action):
         return 0
         # print(self.get_dt(action), self.get_dc(action), self.get_db(), self.get_dw(action), self.get_load_b())
-        return -(self.get_dt(action) / 1000 + self.get_dc(action) / 10 + self.get_db() + self.get_dw(action) + self.get_load_b() / 1000)
+        return -(self.get_dt(action) / 1000 + self.get_dc(action) / 10 + self.get_db() + self.get_dw(
+            action) + self.get_load_b() / 1000)

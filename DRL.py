@@ -24,16 +24,13 @@ class PolicyNet(torch.nn.Module):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = F.relu(self.fc3(x))
-        # return torch.tanh(self.fc3(x)) * self.action_bound
-        return abs(torch.tanh(self.fc4(x))) * self.action_bound
-        # return torch.relu(self.fc3(x)) * self.action_bound
+        return (torch.tanh(self.fc4(x)) + 1) * self.action_bound / 2
 class QValueNet(torch.nn.Module):
     def __init__(self, state_dim, hidden_dim, action_dim):
         super(QValueNet, self).__init__()
         self.fc1 = torch.nn.Linear(state_dim + action_dim, hidden_dim)
         self.fc2 = torch.nn.Linear(hidden_dim, hidden_dim)
         self.fc3 = torch.nn.Linear(hidden_dim, hidden_dim)
-
         self.fc_out = torch.nn.Linear(hidden_dim, 1)
 
     def forward(self, x, a):
@@ -75,6 +72,9 @@ class DDPG:
         action = action.detach().numpy()
         if self.is_test is False:
             action = action + self.sigma * np.random.randn(self.action_dim)
+        for i in range(len(action)):
+            if action[i] < 0:
+                action[i] = 0
         return action
 
     def soft_update(self, net, target_net):
@@ -83,7 +83,7 @@ class DDPG:
 
     def update(self, transition_dict):
         states = torch.tensor(transition_dict['states'], dtype=torch.float).to(self.device)
-        actions = torch.tensor(transition_dict['actions'], dtype=torch.float).to(self.device)
+        actions = torch.tensor(np.array(transition_dict['actions']), dtype=torch.float).to(self.device)
         rewards = torch.tensor(transition_dict['rewards'], dtype=torch.float).view(-1, 1).to(self.device)
         next_states = torch.tensor(transition_dict['next_states'], dtype=torch.float).to(self.device)
         dones = torch.tensor(transition_dict['dones'], dtype=torch.float).view(-1, 1).to(self.device)
@@ -123,6 +123,7 @@ def train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size
                         b_s, b_a, b_r, b_ns, b_d = replay_buffer.sample(batch_size)
                         transition_dict = {'states': b_s, 'actions': b_a, 'next_states': b_ns, 'rewards': b_r, 'dones': b_d}
                         agent.update(transition_dict)
+
                 return_list.append(episode_return)
                 if (i_episode+1) % 10 == 0:
                     pbar.set_postfix({'episode': '%d' % (num_episodes/10 * i + i_episode+1), 'return': '%.3f' % np.mean(return_list[-10:])})
@@ -130,16 +131,16 @@ def train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size
     return return_list
 
 
-actor_lr = 3e-4
-critic_lr = 3e-5
-num_episodes = 1000
+actor_lr = 3e-6
+critic_lr = 3e-7
+num_episodes = 2000
 hidden_dim = 128
 gamma = 0.98
 tau = 0.005  # 软更新参数
 buffer_size = 10000
 minimal_size = 200
 batch_size = 128
-sigma = 30  # 高斯噪声标准差
+sigma = 50  # 高斯噪声标准差
 # device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 device = torch.device("cpu")
 env = env()
@@ -149,17 +150,17 @@ torch.manual_seed(0)
 replay_buffer = rl_utils.ReplayBuffer(buffer_size)
 state_dim = env.N * env.N + env.N + env.N + 2 * env.N  # 链路状态 算力队列状态 任务到达状态 任务估计状态
 action_dim = env.N * (env.N - 1)
-action_bound = 400.0
+action_bound = 500.0
 agent = DDPG(state_dim, hidden_dim, action_dim, action_bound, sigma, actor_lr, critic_lr, tau, gamma, device)
-# return_list = train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size, batch_size)
-
+return_list = train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size, batch_size)
+#
 # episodes_list = list(range(len(return_list)))
 # plt.plot(episodes_list, return_list)
 # plt.xlabel('Episodes')
 # plt.ylabel('Returns')
 # plt.title('DDPG on Sat')
 # plt.show()
-#
+# #
 # mv_return = rl_utils.moving_average(return_list, 9)
 # plt.plot(episodes_list, mv_return)
 # plt.xlabel('Episodes')
@@ -167,19 +168,19 @@ agent = DDPG(state_dim, hidden_dim, action_dim, action_bound, sigma, actor_lr, c
 # plt.title('DDPG on Sat')
 # plt.show()
 
-actions = [[0, 400, 0, 400, 0, 0] for i in range(5)]
+actions = [[200, 200, 200, 200, 200, 200] for i in range(5)]
 def test(env, agent):
     done = False
     state = env.reset()
     agent.set_test(True)
     t = 0
     while done is False:
-        # action = agent.take_action(state)
+        action = agent.take_action(state)
         # action = actions2
-        action = actions[t]
+        # action = actions[t]
         t += 1
         done, reward, next_state = env.step(action)
+        print(reward, state, action)
         state = next_state
-        print(reward, next_state, action)
 
 test(env, agent)

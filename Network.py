@@ -14,11 +14,12 @@ class Network:
         #         self.rand_add_edge(i, j)
         self.G.add_edge(0, 1)
         self.G.add_edge(1, 2)
-
+        # self.G.add_edge(2, 3)
+        # self.G.add_edge(3, 4)
 
         for edge in self.G.edges():
             a, b = edge
-            self.G[a][b]['R'] = 10
+            self.G[a][b]['R'] = 50
 
         if self.check() is False:
             print("图不联通")

@@ -32,9 +32,10 @@ class env:
     def ini(self):
         self.A = [0 for i in range(self.N)]
         # self.sats = [Sat(10, 10, 10) for i in range(self.N)]
-        self.line = np.random.randint(100, 1000, 10)
-        self.line = list(self.line)
-        self.line = [self.line for i in range(self.N)]
+        line1 = np.random.randint(100, 1000, 6)
+        line2 = np.random.randint(100, 1000, 6)
+        line3 = np.random.randint(100, 1000, 6)
+        self.line = [list(line1), list(line2), list(line3)]
         self.sats = [Sat(0, 0, 0, self.kn), Sat(0, 0, 0, self.kn), Sat(2000, 32, 12.8, self.kn)]
 
     def reset(self):
@@ -53,7 +54,9 @@ class env:
         H = sum(H, [])  # 二维展开
         H = list(map(int, H))  # 转化为整数
 
-        return np.concatenate([np.array(R), np.array(Q), np.array(A1), np.array(H)], axis=0)
+        state = np.concatenate([np.array(R), np.array(Q), np.array(A1), np.array(H)], axis=0)
+
+        return np.array(A1)
 
     def update(self):
         for i in range(self.N):
@@ -73,6 +76,7 @@ class env:
         H = list(map(int, H))  # 转化为整数
 
         next_state = np.concatenate((R, Q, A1, H))
+        next_state = A1
         return next_state
 
     def check(self, env_action):
@@ -115,7 +119,7 @@ class env:
             q = 0
             for j in range(self.N):
                 if q + env_action[i][j] > self.line[i][self.t]:
-                    # publish += self.line[i][self.t] - (q + env_action[i][j])
+                    publish += self.line[i][self.t] - (q + env_action[i][j])
                     env_action[i][j] = 0
                 q += env_action[i][j]
             # if q > self.line[i][self.t]:
@@ -150,7 +154,7 @@ class env:
         else:
             isdone = False
 
-        reward += publish * 5 + get
+        reward += publish * 10 + get
         return isdone, reward, next_state
 
     def get_et(self, action):

@@ -14,30 +14,23 @@ class PolicyNet(torch.nn.Module):
     def __init__(self, state_dim, hidden_dim, action_dim, action_bound):
         super(PolicyNet, self).__init__()
         self.fc1 = torch.nn.Linear(state_dim, hidden_dim)
-        self.fc2 = torch.nn.Linear(hidden_dim, 256)
-        self.fc3 = torch.nn.Linear(256, 128)
-
-        self.fc4 = torch.nn.Linear(128, action_dim)
+        self.fc4 = torch.nn.Linear(hidden_dim, action_dim)
         self.action_bound = action_bound  # action_bound是环境可以接受的动作最大值
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = F.relu(self.fc3(x))
         return (torch.tanh(self.fc4(x)) + 1) * self.action_bound / 2
 class QValueNet(torch.nn.Module):
     def __init__(self, state_dim, hidden_dim, action_dim):
         super(QValueNet, self).__init__()
         self.fc1 = torch.nn.Linear(state_dim + action_dim, hidden_dim)
         self.fc2 = torch.nn.Linear(hidden_dim, hidden_dim)
-        self.fc3 = torch.nn.Linear(hidden_dim, hidden_dim)
         self.fc_out = torch.nn.Linear(hidden_dim, 1)
 
     def forward(self, x, a):
         cat = torch.cat([x, a], dim=1)  # 拼接状态和动作
         x = F.relu(self.fc1(cat))
         x = F.relu(self.fc2(x))
-        x = F.relu(self.fc3(x))
         return self.fc_out(x)
 
 
@@ -131,15 +124,16 @@ def train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size
     return return_list
 
 
-actor_lr = 3e-6
-critic_lr = 3e-7
-num_episodes = 2000
+actor_lr = 3e-5
+critic_lr = 3e-6
+num_episodes = 10000
 hidden_dim = 128
 gamma = 0.98
+# gamma = 1
 tau = 0.005  # 软更新参数
 buffer_size = 10000
 minimal_size = 200
-batch_size = 128
+batch_size = 32
 sigma = 50  # 高斯噪声标准差
 # device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 device = torch.device("cpu")
@@ -149,6 +143,7 @@ np.random.seed(0)
 torch.manual_seed(0)
 replay_buffer = rl_utils.ReplayBuffer(buffer_size)
 state_dim = env.N * env.N + env.N + env.N + 2 * env.N  # 链路状态 算力队列状态 任务到达状态 任务估计状态
+state_dim = env.N
 action_dim = env.N * (env.N - 1)
 action_bound = 500.0
 agent = DDPG(state_dim, hidden_dim, action_dim, action_bound, sigma, actor_lr, critic_lr, tau, gamma, device)
